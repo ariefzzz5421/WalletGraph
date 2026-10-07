@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { one, rows } from "@/lib/db";
 import { CHAINS, type Chain } from "@/lib/chains";
 import { ChainBadge, EmptyState, StatusBadge, Time, formatAmount } from "@/components/ui";
@@ -10,7 +10,7 @@ type Wallet={id:string;name:string;address:string;chain:Chain;category:string|nu
 type Event={id:string;tx_hash:string;event_type:string;direction:string;amount:string|null;token_symbol:string|null;usd_value:string|null;occurred_at:Date;source:string;from_address:string|null;to_address:string|null};
 type Job={mode:string;status:string;processed:number;error:string|null;created_at:Date};
 export default async function WalletPage({params}:{params:Promise<{id:string}>}){
-  const user=(await currentUser())!;const {id}=await params;
+  const user=await readyWorkspaceUser();if(!user)return null;const {id}=await params;
   const wallet=await one<Wallet>(`SELECT w.*,COALESCE(array_agg(t.name ORDER BY t.name) FILTER(WHERE t.id IS NOT NULL),'{}') AS tags
     FROM wallets w LEFT JOIN wallet_tags wt ON wt.wallet_id=w.id LEFT JOIN tags t ON t.id=wt.tag_id WHERE w.id=$1 AND w.user_id=$2 GROUP BY w.id`,[id,user.id]);
   if(!wallet)notFound();

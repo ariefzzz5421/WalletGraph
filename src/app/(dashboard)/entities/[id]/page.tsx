@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { one, rows } from "@/lib/db";
 import { CHAINS, type Chain } from "@/lib/chains";
 import { EntityEdit, EntityMembership } from "@/components/entity-actions";
@@ -8,7 +8,7 @@ import { ChainBadge, EmptyState, Time, formatAmount } from "@/components/ui";
 type Entity={id:string;name:string;category:string|null;notes:string|null;created_at:Date};
 type Wallet={id:string;name:string;address:string;chain:Chain};
 type Event={event_key:string;wallet_id:string;wallet_name:string;event_type:string;direction:string;amount:string|null;token_symbol:string|null;chain:Chain;tx_hash:string;occurred_at:Date};
-export default async function EntityPage({params}:{params:Promise<{id:string}>}){const user=(await currentUser())!;const {id}=await params;
+export default async function EntityPage({params}:{params:Promise<{id:string}>}){const user=await readyWorkspaceUser();if(!user)return null;const {id}=await params;
   const entity=await one<Entity>("SELECT id,name,category,notes,created_at FROM entities WHERE id=$1 AND user_id=$2",[id,user.id]);if(!entity)notFound();
   const [members,available,stats,events]=await Promise.all([
     rows<Wallet>("SELECT w.id,w.name,w.address,w.chain FROM entity_wallets ew JOIN wallets w ON w.id=ew.wallet_id WHERE ew.entity_id=$1 AND ew.user_id=$2 ORDER BY w.name",[id,user.id]),

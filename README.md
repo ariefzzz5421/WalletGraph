@@ -1,10 +1,10 @@
 # WalletGraph
 
-WalletGraph is a private on-chain watchlist and alert platform. This repository implements the Phase 1 foundation: accounts, multi-chain wallet records, custom tags and notes, verified transfer ingestion, an activity feed, Discord pairing, and rule-based Discord alerts. The web app, ingestion worker, and Discord bot run as separate processes.
+WalletGraph is a private on-chain watchlist and alert platform. This repository implements the Phase 1 foundation: password-gated access, multi-chain wallet records, custom tags and notes, verified transfer ingestion, an activity feed, Discord pairing, and rule-based Discord alerts. The web app, ingestion worker, and Discord bot run as separate processes.
 
 ## What works now
 
-- One-time setup with a username and password, password login, server-side sessions, account-scoped data, audit records, and basic login rate limiting. Public sign-up closes after the first account is created.
+- One shared site password, checked against a server-side scrypt hash. A signed, HTTP-only cookie unlocks the dashboard for seven days; changing the password invalidates existing cookies. No account creation, username, or email is needed. All people with the password share one workspace; this is temporary access control, not individual user identity.
 - Add, edit, search, and remove wallets on Ethereum, Base, Solana, Avalanche, Arbitrum, Optimism, Polygon, and BNB Chain. EVM addresses are normalized; Solana addresses preserve case.
 - Queue latest, 7/30/90-day, or full-history syncs. The worker records scan progress and provider health. Repeat scans deduplicate events.
 - Alchemy Transfers adapter for EVM native, token, and NFT transfers where supported. Solana standard RPC adapter for parsed native SOL transfers. Each record retains the raw provider response.
@@ -19,11 +19,11 @@ WalletGraph is a private on-chain watchlist and alert platform. This repository 
 
 Requirements: Node.js 24+, PostgreSQL 17+, and a Discord application only if bot alerts are needed.
 
-1. Copy `.env.example` to `.env`. Set a PostgreSQL `DATABASE_URL`. Keep `.env` out of Git.
+1. Copy `.env.example` to `.env`. Generate a password hash with `npx tsx scripts/site-password.ts` (it prompts without displaying the password) and put the result in `SITE_ACCESS_PASSWORD_HASH`. Generate a random secret of at least 32 characters for `SITE_SESSION_SECRET`. Keep `.env` out of Git. Add `DATABASE_URL` when PostgreSQL is ready.
 2. Start PostgreSQL. `docker compose up -d` is provided as one option; a local or managed PostgreSQL instance also works. Change the example database password before any shared or remote deployment.
 3. Run `npm install`, then `npm run db:migrate`. Numbered SQL migrations are tracked in `schema_migrations` and applied once in order.
 4. Start the web app with `npm run dev` and the ingestion process in another terminal with `npm run worker`.
-5. Open `http://localhost:3000`, create the first account with a username and password, then add a wallet. The first account receives the `admin` role and closes public sign-up. Existing email-based accounts can still sign in using their email as the username.
+5. Open `http://localhost:3000` and enter the site password. After migration 006 has created the internal workspace record, add a wallet. If the database is absent or unavailable, the unlocked dashboard shows its data status without inventing activity.
 6. For EVM activity, set `ALCHEMY_API_KEY`. For Solana native transfers, set `SOLANA_RPC_URL` to a trusted RPC endpoint. Restart the worker after changing these values.
 7. For Discord, set `DISCORD_BOT_TOKEN` and `DISCORD_CLIENT_ID`, start `npm run bot`, generate a pairing code in the Discord page, invite the bot, then run `/connect` in the desired alert channel.
 
@@ -31,7 +31,7 @@ The environment file is read by the worker, bot, and migration scripts with Node
 
 ## Deployment
 
-- Deploy the Next.js app to Vercel with `DATABASE_URL`. `APP_URL` is optional for the web app; set it to the final public URL on the separately hosted bot so `/wallet graph` links work.
+- Deploy the Next.js app to Vercel with `SITE_ACCESS_PASSWORD_HASH` and `SITE_SESSION_SECRET` as server-side environment variables. Add `DATABASE_URL` for watchlists and activity. `APP_URL` is optional for the web app; set it to the final public URL on the separately hosted bot so `/wallet graph` links work.
 - Deploy `npm run worker` and `npm run bot` as separate long-running services on Railway, Fly.io, Render, or a VPS. Do not run either as a Vercel request function.
 - Run `npm run db:migrate` during controlled deployment before starting the new release. The migration runner prefers `DATABASE_URL_UNPOOLED` when available, because it holds a session lock while applying SQL files. Use a managed PostgreSQL instance with backups and TLS. The included Compose file is for local development only.
 - All API keys and Discord bot credentials stay server-side. The Data Sources page displays status only, never secret values.
@@ -45,14 +45,16 @@ Discord delivery is durable and deduplicated at the database level by rule, even
 ## Architecture
 
 ```
-Next.js dashboard and authenticated API ──→ PostgreSQL
+Next.js password gate, dashboard, and API ──→ PostgreSQL
                                              ↑       ↓
 Alchemy / Solana RPC ──→ worker ──→ normalized wallet events
                                     └─→ alert matches ──→ Discord deliveries
 Discord bot ──→ pairing and slash commands ────────────────┘
 ```
 
-`src/lib/providers/types.ts` defines the provider interface. New adapters can be registered in `src/lib/providers/index.ts`. Event keys are derived from chain plus provider transaction event identity; the database also enforces `(wallet_id,event_key)` uniqueness. Jobs are claimed with PostgreSQL `SKIP LOCKED` and stale jobs are reclaimed. Each user-scoped query filters by `user_id`.
+`src/lib/providers/types.ts` defines the provider interface. New adapters can be registered in `src/lib/providers/index.ts`. Event keys are derived from chain plus provider transaction event identity; the database also enforces `(wallet_id,event_key)` uniqueness. Jobs are claimed with PostgreSQL `SKIP LOCKED` and stale jobs are reclaimed. Each workspace query filters by the internal `user_id`. This shared-password mode does not isolate data between people who know the password.
+
+Migration 006 creates a new internal workspace record without deleting earlier account records. Existing account-owned data remains in PostgreSQL but is not shown in the shared workspace; move it deliberately if converting an installation with real account data.
 
 ## Next phases
 

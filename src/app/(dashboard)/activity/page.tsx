@@ -1,11 +1,11 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { rows } from "@/lib/db";
 import { CHAINS, type Chain } from "@/lib/chains";
 import { Address, ChainBadge, EmptyState, PageHeader, Time, formatAmount } from "@/components/ui";
 type Event={id:string;wallet_id:string;wallet_name:string;address:string;chain:Chain;tx_hash:string;event_type:string;direction:string;amount:string|null;token_symbol:string|null;usd_value:string|null;occurred_at:Date};
 export default async function ActivityPage({searchParams}:{searchParams:Promise<{q?:string;chain?:string;type?:string;page?:string}>}){
-  const user=(await currentUser())!;const p=await searchParams;const q=p.q?.slice(0,100)??"";const chain=p.chain&&p.chain in CHAINS?p.chain:null;const type=["TRANSFER","NFT_TRANSFER"].includes(p.type??"")?p.type:null;
+  const user=await readyWorkspaceUser();if(!user)return null;const p=await searchParams;const q=p.q?.slice(0,100)??"";const chain=p.chain&&p.chain in CHAINS?p.chain:null;const type=["TRANSFER","NFT_TRANSFER"].includes(p.type??"")?p.type:null;
   const page=Math.max(1,Math.min(10000,Number(p.page)||1));
   const events=await rows<Event>(`SELECT e.id,e.wallet_id,w.name AS wallet_name,w.address,e.chain,e.tx_hash,e.event_type,e.direction,e.amount,e.token_symbol,e.usd_value,e.occurred_at
     FROM wallet_events e JOIN wallets w ON w.id=e.wallet_id WHERE e.user_id=$1

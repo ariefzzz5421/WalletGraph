@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { ArrowUpRight, Bell, Database, Plus, Wallet } from "lucide-react";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { one, rows } from "@/lib/db";
 import { Address, ChainBadge, EmptyState, PageHeader, StatusBadge, Time, formatAmount } from "@/components/ui";
 import type { Chain } from "@/lib/chains";
@@ -8,7 +8,7 @@ type Stats={wallets:string;events_24h:string;alerts_sent:string;active_chains:st
 type WalletRow={id:string;name:string;address:string;chain:Chain;sync_status:string;created_at:Date};
 type EventRow={id:string;wallet_id:string;wallet_name:string;event_type:string;direction:string;amount:string|null;token_symbol:string|null;chain:Chain;occurred_at:Date};
 export default async function OverviewPage(){
-  const user=(await currentUser())!;
+  const user=await readyWorkspaceUser();if(!user)return null;
   const [stats,wallets,events]=await Promise.all([
     one<Stats>(`SELECT (SELECT count(*) FROM wallets WHERE user_id=$1)::text AS wallets,
       (SELECT count(*) FROM wallet_events WHERE user_id=$1 AND occurred_at>now()-interval '24 hours')::text AS events_24h,

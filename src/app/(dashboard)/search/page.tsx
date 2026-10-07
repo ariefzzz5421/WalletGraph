@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { rows } from "@/lib/db";
 import { CHAINS, type Chain } from "@/lib/chains";
 import { Address, ChainBadge, EmptyState, PageHeader } from "@/components/ui";
@@ -8,7 +8,7 @@ type EntityResult={id:string;name:string;category:string|null};
 type TagResult={id:string;name:string;wallet_count:number};
 type TokenResult={token_address:string;token_symbol:string|null;chain:Chain;event_count:number};
 export default async function SearchPage({searchParams}:{searchParams:Promise<{q?:string}>}){
-  const user=(await currentUser())!;const q=(await searchParams).q?.trim().slice(0,80)??"";
+  const user=await readyWorkspaceUser();if(!user)return null;const q=(await searchParams).q?.trim().slice(0,80)??"";
   const [wallets,entities,tags,tokens]=q.length>=2?await Promise.all([
     rows<WalletResult>("SELECT id,name,address,chain FROM wallets WHERE user_id=$1 AND (name ILIKE '%'||$2||'%' OR address ILIKE '%'||$2||'%') ORDER BY name LIMIT 20",[user.id,q]),
     rows<EntityResult>("SELECT id,name,category FROM entities WHERE user_id=$1 AND name ILIKE '%'||$2||'%' ORDER BY name LIMIT 20",[user.id,q]),

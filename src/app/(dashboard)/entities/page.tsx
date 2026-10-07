@@ -1,10 +1,10 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { rows } from "@/lib/db";
 import { EntityForm } from "@/components/entity-form";
 import { EmptyState, PageHeader, Time } from "@/components/ui";
 type Entity={id:string;name:string;category:string|null;notes:string|null;wallet_count:number;chain_count:number;created_at:Date};
-export default async function EntitiesPage({searchParams}:{searchParams:Promise<{page?:string}>}){const user=(await currentUser())!;const p=await searchParams;const page=Math.max(1,Math.min(10000,Number(p.page)||1));
+export default async function EntitiesPage({searchParams}:{searchParams:Promise<{page?:string}>}){const user=await readyWorkspaceUser();if(!user)return null;const p=await searchParams;const page=Math.max(1,Math.min(10000,Number(p.page)||1));
   const entities=await rows<Entity>(`SELECT e.id,e.name,e.category,e.notes,e.created_at,count(ew.wallet_id)::int AS wallet_count,count(DISTINCT w.chain)::int AS chain_count
     FROM entities e LEFT JOIN entity_wallets ew ON ew.entity_id=e.id LEFT JOIN wallets w ON w.id=ew.wallet_id
     WHERE e.user_id=$1 GROUP BY e.id ORDER BY e.created_at DESC LIMIT 30 OFFSET $2`,[user.id,(page-1)*30]);

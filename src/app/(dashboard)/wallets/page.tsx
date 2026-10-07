@@ -1,12 +1,12 @@
 import Link from "next/link";
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { rows } from "@/lib/db";
 import { WalletForm } from "@/components/wallet-form";
 import { Address, ChainBadge, EmptyState, PageHeader, StatusBadge, Time } from "@/components/ui";
 import { CHAINS, type Chain } from "@/lib/chains";
 type WalletRow={id:string;name:string;address:string;chain:Chain;category:string|null;priority:string;sync_status:string;created_at:Date;tags:string[]};
 export default async function WalletsPage({searchParams}:{searchParams:Promise<{q?:string;tag?:string;page?:string;chain?:string;address?:string}>}){
-  const user=(await currentUser())!;const params=await searchParams;const q=params.q?.slice(0,100)??"";const tag=params.tag?.slice(0,40)??"";const page=Math.max(1,Math.min(10000,Number(params.page)||1));
+  const user=await readyWorkspaceUser();if(!user)return null;const params=await searchParams;const q=params.q?.slice(0,100)??"";const tag=params.tag?.slice(0,40)??"";const page=Math.max(1,Math.min(10000,Number(params.page)||1));
   const wallets=await rows<WalletRow>(`SELECT w.id,w.name,w.address,w.chain,w.category,w.priority,w.sync_status,w.created_at,
     COALESCE(array_agg(t.name ORDER BY t.name) FILTER(WHERE t.id IS NOT NULL),'{}') AS tags
     FROM wallets w LEFT JOIN wallet_tags wt ON wt.wallet_id=w.id LEFT JOIN tags t ON t.id=wt.tag_id

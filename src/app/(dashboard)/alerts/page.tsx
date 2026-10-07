@@ -1,9 +1,9 @@
-import { currentUser } from "@/lib/auth";
+import { readyWorkspaceUser } from "@/lib/page-access";
 import { rows } from "@/lib/db";
 import { AlertForm, RuleActions } from "@/components/alert-form";
 import { EmptyState, PageHeader, Time } from "@/components/ui";
 type Rule={id:string;name:string;wallet_name:string|null;event_type:string|null;direction:string|null;chain:string|null;token_symbol:string|null;min_usd:string|null;enabled:boolean;created_at:Date};
-export default async function AlertsPage(){const user=(await currentUser())!;
+export default async function AlertsPage(){const user=await readyWorkspaceUser();if(!user)return null;
   const [rules,wallets,connection]=await Promise.all([
     rows<Rule>(`SELECT ar.id,ar.name,ar.event_type,ar.direction,ar.chain,ar.token_symbol,ar.min_usd,ar.enabled,ar.created_at,w.name AS wallet_name
       FROM alert_rules ar LEFT JOIN wallets w ON w.id=ar.wallet_id WHERE ar.user_id=$1 ORDER BY ar.created_at DESC LIMIT 100`,[user.id]),

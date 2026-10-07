@@ -1,13 +1,10 @@
 import "server-only";
-import { cookies } from "next/headers";
-import { one } from "@/lib/db";
-import { hashToken } from "@/lib/security";
+import { hasSiteAccess, WORKSPACE_USER_ID } from "@/lib/site-access";
 
 export type User = { id: string; username: string; role: "admin" | "member" };
 export async function currentUser(): Promise<User | null> {
-  const token = (await cookies()).get("wg_session")?.value;
-  if (!token) return null;
-  return one<User>("SELECT u.id,COALESCE(u.username,u.email) AS username,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.token_hash=$1 AND s.expires_at>now()", [hashToken(token)]);
+  if (!await hasSiteAccess()) return null;
+  return { id: WORKSPACE_USER_ID, username: "Site workspace", role: "admin" };
 }
 export async function requireUser(): Promise<User> {
   const user = await currentUser();
