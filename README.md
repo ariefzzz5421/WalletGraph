@@ -10,7 +10,10 @@ WalletGraph is a private on-chain watchlist and alert platform. This repository 
 - Alchemy Transfers adapter for EVM native, token, and NFT transfers where supported. Solana standard RPC adapter for parsed native SOL transfers. Each record retains the raw provider response.
 - Activity feed and wallet profile with clear unknown/unverified fields. Transfer events are never relabeled as swaps or bridges without transaction decoding evidence.
 - Alert rules for wallet, chain, event type, direction, token symbol, and minimum verified USD value. Matching is deterministic. The worker creates one Discord delivery per connected server and retries failures.
-- Discord bot pairing via `/connect`, plus `/wallet track`, `/wallet remove`, `/wallet info`, `/wallet activity`, `/wallet tags`, and `/alerts list`. Manage Server permission is required for all commands.
+- Discord bot pairing via `/connect`, plus `/wallet track`, `/wallet remove`, `/wallet info`, `/wallet activity`, `/wallet graph`, `/wallet portfolio`, `/wallet tags`, and `/alerts list|create|delete`. Manage Server permission is required for all commands.
+- An evidence-backed network graph with one to three hops, time/type/count filters, bounded queries, clickable expansion, and transaction links. Its edges are observed transfers, not identity conclusions.
+- Manual entities can group wallets across chains and show distinct indexed events. Database constraints prevent cross-account membership and place each wallet in at most one entity.
+- Workspace search covers wallet addresses/names, entity names, custom tags, and token contracts observed in your indexed events. Search links lead to the relevant wallet, entity, filtered watchlist, or activity feed.
 
 ## Run locally
 
@@ -18,7 +21,7 @@ Requirements: Node.js 24+, PostgreSQL 17+, and a Discord application only if bot
 
 1. Copy `.env.example` to `.env`. Set a private `REGISTRATION_CODE` with at least 20 characters and a PostgreSQL `DATABASE_URL`. Keep `.env` out of Git.
 2. Start PostgreSQL. `docker compose up -d` is provided as one option; a local or managed PostgreSQL instance also works. Change the example database password before any shared or remote deployment.
-3. Run `npm install`, then `npm run db:migrate`.
+3. Run `npm install`, then `npm run db:migrate`. Numbered SQL migrations are tracked in `schema_migrations` and applied once in order.
 4. Start the web app with `npm run dev` and the ingestion process in another terminal with `npm run worker`.
 5. Open `http://localhost:3000`, create the first account with the registration code, then add a wallet. The first registered account receives the `admin` role; further invited accounts receive `member`.
 6. For EVM activity, set `ALCHEMY_API_KEY`. For Solana native transfers, set `SOLANA_RPC_URL` to a trusted RPC endpoint. Restart the worker after changing these values.
@@ -53,7 +56,7 @@ Discord bot ──→ pairing and slash commands ──────────�
 
 ## Next phases
 
-Phase 2: entities, evidence-backed relationships, a bounded network graph, token intelligence, verified price enrichment, richer alert expressions, provider fallback, and user-facing provider configuration. Phase 3: clusters, discovery, anomalies, deep historical analytics, and AI explanations tied to transaction evidence. The sidebar marks these as planned instead of showing fabricated intelligence.
+The first Phase 2 slice now includes manual entities and a bounded observed-transfer graph. Remaining Phase 2 work: token intelligence, verified price enrichment, richer alert expressions, provider fallback, and user-facing provider configuration. Phase 3: clusters, discovery, anomalies, deep historical analytics, and AI explanations tied to transaction evidence. The sidebar marks future features as planned instead of showing fabricated intelligence.
 
 ## Checks
 

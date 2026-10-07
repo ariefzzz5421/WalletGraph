@@ -47,7 +47,7 @@ export class AlchemyProvider implements BlockchainProvider {
       const actualDirection = t.from.toLowerCase() === address.toLowerCase() && t.to?.toLowerCase() === address.toLowerCase() ? "self" : direction;
       return [{
         eventKey, chain, txHash: t.hash, eventIndex, eventType: isNft ? "NFT_TRANSFER" as const : "TRANSFER" as const,
-        direction: actualDirection, fromAddress: t.from, toAddress: t.to,
+        direction: actualDirection, fromAddress: t.from.toLowerCase(), toAddress: t.to?.toLowerCase() ?? null,
         tokenSymbol: isNft ? (t.asset ?? "NFT") : t.asset,
         tokenAddress: t.rawContract?.address ?? null,
         amount: t.value == null || !Number.isFinite(t.value) ? null : String(t.value),

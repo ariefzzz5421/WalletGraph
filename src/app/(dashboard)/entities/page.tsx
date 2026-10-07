@@ -1,0 +1,12 @@
+import Link from "next/link";
+import { currentUser } from "@/lib/auth";
+import { rows } from "@/lib/db";
+import { EntityForm } from "@/components/entity-form";
+import { EmptyState, PageHeader, Time } from "@/components/ui";
+type Entity={id:string;name:string;category:string|null;notes:string|null;wallet_count:number;chain_count:number;created_at:Date};
+export default async function EntitiesPage({searchParams}:{searchParams:Promise<{page?:string}>}){const user=(await currentUser())!;const p=await searchParams;const page=Math.max(1,Math.min(10000,Number(p.page)||1));
+  const entities=await rows<Entity>(`SELECT e.id,e.name,e.category,e.notes,e.created_at,count(ew.wallet_id)::int AS wallet_count,count(DISTINCT w.chain)::int AS chain_count
+    FROM entities e LEFT JOIN entity_wallets ew ON ew.entity_id=e.id LEFT JOIN wallets w ON w.id=ew.wallet_id
+    WHERE e.user_id=$1 GROUP BY e.id ORDER BY e.created_at DESC LIMIT 30 OFFSET $2`,[user.id,(page-1)*30]);
+  return <><PageHeader eyebrow="ORGANIZE / ENTITIES" title="Entities" description="Manually group wallets across chains and inspect combined indexed activity."/><div className="wallets-layout"><section className="panel"><div className="panel-heading"><div><span className="eyebrow">GROUPINGS</span><h2>Your entities</h2></div><span className="count-pill">{entities.length}{page>1?" on page":""}</span></div>{entities.length?<div className="entity-list">{entities.map(e=><Link href={`/entities/${e.id}`} className="entity-row" key={e.id}><span className="entity-symbol">⌘</span><span><strong>{e.name}</strong><small>{e.category||"Uncategorized"} · {e.wallet_count} wallets · {e.chain_count} chains</small><small className="entity-note">{e.notes||"No notes added"}</small></span><span className="entity-date"><Time value={e.created_at}/></span></Link>)}</div>:<EmptyState title="No entities yet" body="Create a manual grouping for related wallets. Membership remains a user annotation, not an ownership claim."/>}<div className="pagination">{page>1&&<Link className="button secondary" href={`/entities?page=${page-1}`}>← Previous</Link>}{entities.length===30&&<Link className="button secondary" href={`/entities?page=${page+1}`}>Next →</Link>}</div></section><section className="panel form-panel"><div className="panel-heading"><div><span className="eyebrow">NEW GROUPING</span><h2>Create entity</h2></div></div><div className="entity-form-wrap"><EntityForm/></div></section></div></>;
+}

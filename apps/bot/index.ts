@@ -12,13 +12,23 @@ const commands = [
   new SlashCommandBuilder().setName("wallet").setDescription("Tracked wallet intelligence")
     .addSubcommand(s=>s.setName("info").setDescription("Show a tracked wallet").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true)))
     .addSubcommand(s=>s.setName("activity").setDescription("Recent verified activity").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true)))
+    .addSubcommand(s=>s.setName("graph").setDescription("Open observed wallet network").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true)))
+    .addSubcommand(s=>s.setName("portfolio").setDescription("Show verified portfolio coverage").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true)))
     .addSubcommand(s=>s.setName("tags").setDescription("Wallet labels").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true)))
     .addSubcommand(s=>s.setName("track").setDescription("Track a wallet").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true))
       .addStringOption(o=>o.setName("chain").setDescription("Network").setRequired(true).addChoices(...chainChoices))
       .addStringOption(o=>o.setName("name").setDescription("Wallet name").setRequired(true)))
-    .addSubcommand(s=>s.setName("remove").setDescription("Stop tracking a wallet").addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true))),
+    .addSubcommand(s=>s.setName("remove").setDescription("Remove a wallet and its indexed activity")
+      .addStringOption(o=>o.setName("address").setDescription("Wallet address").setRequired(true))
+      .addBooleanOption(o=>o.setName("confirm").setDescription("Confirm deletion of indexed activity").setRequired(true))),
   new SlashCommandBuilder().setName("alerts").setDescription("WalletGraph alert rules")
     .addSubcommand(s=>s.setName("list").setDescription("List alert rules"))
+    .addSubcommand(s=>s.setName("create").setDescription("Create a transfer alert")
+      .addStringOption(o=>o.setName("name").setDescription("Rule name").setRequired(true))
+      .addStringOption(o=>o.setName("direction").setDescription("Transfer direction").setRequired(true).addChoices({name:"Incoming",value:"in"},{name:"Outgoing",value:"out"})))
+    .addSubcommand(s=>s.setName("delete").setDescription("Delete a rule by its ID prefix")
+      .addStringOption(o=>o.setName("id").setDescription("Rule ID prefix from /alerts list").setRequired(true))
+      .addBooleanOption(o=>o.setName("confirm").setDescription("Confirm rule deletion").setRequired(true)))
 ];
 
 client.once("ready", async () => {
@@ -45,8 +55,27 @@ client.on("interactionCreate", async interaction => {
     const link = await one<{user_id:string}>("SELECT user_id FROM discord_connections WHERE guild_id=$1",[interaction.guildId]);
     if (!link) { await interaction.editReply("Connect this server from the WalletGraph dashboard first."); return; }
     if (interaction.commandName === "alerts") {
-      const rules = await rows<{name:string;enabled:boolean}>("SELECT name,enabled FROM alert_rules WHERE user_id=$1 ORDER BY created_at DESC LIMIT 15",[link.user_id]);
-      await interaction.editReply(rules.length ? rules.map(r=>`${r.enabled?"●":"○"} ${r.name}`).join("\n") : "No alert rules yet. Create one in the dashboard."); return;
+      const sub=interaction.options.getSubcommand();
+      if(sub==="create"){
+        const name=interaction.options.getString("name",true).trim().slice(0,80);
+        const direction=interaction.options.getString("direction",true);
+        if(!name){await interaction.editReply("Rule name is required.");return;}
+        const rule=await one<{id:string}>("INSERT INTO alert_rules(user_id,name,event_type,direction) VALUES($1,$2,'TRANSFER',$3) RETURNING id",[link.user_id,name,direction]);
+        await db().query("INSERT INTO audit_log(user_id,action,target_type,target_id) VALUES($1,'alert.create','alert',$2)",[link.user_id,rule?.id]);
+        await interaction.editReply(`Created **${name}** for ${direction === "in"?"incoming":"outgoing"} transfers. Rule ID: ${rule?.id.slice(0,8)}`);return;
+      }
+      if(sub==="delete"){
+        if(!interaction.options.getBoolean("confirm",true)){await interaction.editReply("Deletion cancelled.");return;}
+        const prefix=interaction.options.getString("id",true).trim().toLowerCase();
+        if(!/^[0-9a-f-]{8,36}$/.test(prefix)){await interaction.editReply("Enter at least 8 characters from a rule ID.");return;}
+        const matches=await rows<{id:string;name:string}>("SELECT id,name FROM alert_rules WHERE user_id=$1 AND id::text LIKE $2||'%' LIMIT 2",[link.user_id,prefix]);
+        if(matches.length!==1){await interaction.editReply(matches.length?"ID prefix matches more than one rule.":"Rule not found.");return;}
+        await db().query("DELETE FROM alert_rules WHERE id=$1 AND user_id=$2",[matches[0].id,link.user_id]);
+        await db().query("INSERT INTO audit_log(user_id,action,target_type,target_id) VALUES($1,'alert.delete','alert',$2)",[link.user_id,matches[0].id]);
+        await interaction.editReply(`Deleted alert rule **${matches[0].name}**.`);return;
+      }
+      const rules = await rows<{id:string;name:string;enabled:boolean}>("SELECT id,name,enabled FROM alert_rules WHERE user_id=$1 ORDER BY created_at DESC LIMIT 15",[link.user_id]);
+      await interaction.editReply(rules.length ? rules.map(r=>`${r.enabled?"●":"○"} ${r.id.slice(0,8)} · ${r.name}`).join("\n") : "No alert rules yet. Use /alerts create or the dashboard."); return;
     }
     if (interaction.commandName !== "wallet") return;
     const sub = interaction.options.getSubcommand();
@@ -68,6 +97,7 @@ client.on("interactionCreate", async interaction => {
     if (wallets.length>1) { await interaction.editReply("Address exists on multiple chains. Use the dashboard to select the network."); return; }
     const wallet=wallets[0];
     if (sub === "remove") {
+      if(!interaction.options.getBoolean("confirm",true)){await interaction.editReply("Removal cancelled.");return;}
       await db().query("DELETE FROM wallets WHERE id=$1 AND user_id=$2",[wallet.id,link.user_id]);
       await db().query("INSERT INTO audit_log(user_id,action,target_type,target_id) VALUES($1,'wallet.delete','wallet',$2)",[link.user_id,wallet.id]);
       await interaction.editReply(`Stopped tracking ${wallet.name}.`); return;
@@ -79,6 +109,13 @@ client.on("interactionCreate", async interaction => {
     if (sub === "activity") {
       const events=await rows<{event_type:string;direction:string;amount:string|null;token_symbol:string|null;tx_hash:string}>("SELECT event_type,direction,amount,token_symbol,tx_hash FROM wallet_events WHERE wallet_id=$1 ORDER BY occurred_at DESC LIMIT 5",[wallet.id]);
       await interaction.editReply(events.length?events.map(e=>`${e.direction.toUpperCase()} ${e.event_type}: ${e.amount??"?"} ${e.token_symbol??"unknown token"} · ${e.tx_hash.slice(0,12)}…`).join("\n"):"No verified activity indexed yet."); return;
+    }
+    if (sub === "graph") {
+      const appUrl=process.env.APP_URL;
+      await interaction.editReply(appUrl?`Observed network for **${wallet.name}**: ${appUrl.replace(/\/$/,"")}/network-graph?wallet=${wallet.id}\nEdges indicate transfers, not common ownership.`:"Graph link unavailable until APP_URL is configured on the bot service.");return;
+    }
+    if (sub === "portfolio") {
+      await interaction.editReply(`**${wallet.name}** · ${CHAINS[wallet.chain].label}\nPortfolio value: Unknown. A verified balance and price provider is not configured.`);return;
     }
     const count=await one<{count:string}>("SELECT count(*)::text AS count FROM wallet_events WHERE wallet_id=$1",[wallet.id]);
     await interaction.editReply(`**${wallet.name}**\n${CHAINS[wallet.chain].label} · ${wallet.address}\nIndexed events: ${count?.count??"0"}\nSync: ${wallet.sync_status}\nPortfolio value: Unknown`);

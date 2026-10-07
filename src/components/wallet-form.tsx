@@ -2,9 +2,9 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { CHAINS, type Chain } from "@/lib/chains";
-export function WalletForm(){
+export function WalletForm({initialChain="ethereum",initialAddress=""}:{initialChain?:Chain;initialAddress?:string}){
   const router=useRouter(); const [busy,setBusy]=useState(false); const [error,setError]=useState("");
-  const [name,setName]=useState(""); const [address,setAddress]=useState(""); const [chain,setChain]=useState<Chain>("ethereum");
+  const [name,setName]=useState(""); const [address,setAddress]=useState(initialAddress); const [chain,setChain]=useState<Chain>(initialChain);
   const [tags,setTags]=useState(""); const [category,setCategory]=useState(""); const [entityName,setEntityName]=useState(""); const [notes,setNotes]=useState(""); const [priority,setPriority]=useState("normal"); const [alertLevel,setAlertLevel]=useState("all"); const [backfill,setBackfill]=useState("latest");
   async function submit(event:React.FormEvent){
     event.preventDefault();setBusy(true);setError("");
