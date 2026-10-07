@@ -1,0 +1,9 @@
+import { currentUser } from "@/lib/auth";
+import { rows } from "@/lib/db";
+import { DiscordPair } from "@/components/discord-pair";
+import { EmptyState, PageHeader, StatusBadge, Time } from "@/components/ui";
+type Connection={id:string;guild_name:string|null;channel_name:string|null;connected_at:Date|null};
+export default async function DiscordPage(){const user=(await currentUser())!;const connections=await rows<Connection>("SELECT id,guild_name,channel_name,connected_at FROM discord_connections WHERE user_id=$1 AND guild_id IS NOT NULL ORDER BY connected_at DESC LIMIT 20",[user.id]);
+  const configured=Boolean(process.env.DISCORD_BOT_TOKEN&&process.env.DISCORD_CLIENT_ID);
+  return <><PageHeader eyebrow="DISTRIBUTE / DISCORD" title="Discord connection" description="Link a server through the bot, then receive deduplicated alerts in a chosen channel."/><div className="discord-grid"><section className="panel"><div className="panel-heading"><div><span className="eyebrow">DELIVERY ENDPOINTS</span><h2>Connected servers</h2></div></div>{connections.length?<div className="compact-list">{connections.map(c=><div className="compact-row" key={c.id}><div className="wallet-avatar discord-avatar">#</div><div className="row-primary"><strong>{c.guild_name}</strong><span>#{c.channel_name} · Connected {c.connected_at&&<Time value={c.connected_at}/>}</span></div><StatusBadge status="ready"/></div>)}</div>:<EmptyState title="No server connected" body="Generate a code, invite the bot, and pair it from the channel where alerts should appear."/>}</section><section className="panel form-panel"><div className="panel-heading"><div><span className="eyebrow">SETUP</span><h2>Connect a server</h2></div></div><p className="muted">Only a Discord member with Manage Server permission can finish pairing. The bot sends messages to the channel used for the pairing command.</p><DiscordPair configured={configured}/></section></div></>;
+}

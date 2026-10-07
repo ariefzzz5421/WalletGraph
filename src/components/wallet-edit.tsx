@@ -1,0 +1,12 @@
+"use client";
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+type Wallet={id:string;name:string;category:string|null;entity_name:string|null;notes:string|null;priority:string;alert_level:string;tags:string[]};
+export function WalletEdit({wallet}:{wallet:Wallet}){
+  const router=useRouter();const [open,setOpen]=useState(false);const [busy,setBusy]=useState(false);const [error,setError]=useState("");
+  async function submit(event:React.FormEvent<HTMLFormElement>){event.preventDefault();setBusy(true);setError("");const data=new FormData(event.currentTarget);
+    try{const response=await fetch(`/api/wallets/${wallet.id}`,{method:"PATCH",headers:{"content-type":"application/json"},body:JSON.stringify({name:data.get("name"),category:data.get("category"),entityName:data.get("entityName"),notes:data.get("notes"),priority:data.get("priority"),alertLevel:data.get("alertLevel"),tags:String(data.get("tags")??"").split(",").map(x=>x.trim()).filter(Boolean)})});
+      const result=await response.json();if(!response.ok)throw new Error(result.error??"Update failed");setOpen(false);router.refresh();
+    }catch(e){setError(e instanceof Error?e.message:"Update failed");}finally{setBusy(false);}}
+  return <><button className="button secondary" onClick={()=>setOpen(!open)}>{open?"Close editor":"Edit intelligence"}</button>{open&&<form onSubmit={submit} className="form-stack edit-form"><div className="form-row"><label>Name<input name="name" required defaultValue={wallet.name}/></label><label>Category<input name="category" defaultValue={wallet.category??""}/></label></div><label>Entity <span className="optional">manual, unverified</span><input name="entityName" defaultValue={wallet.entity_name??""}/></label><label>Tags<input name="tags" defaultValue={wallet.tags.join(", ")}/></label><label>Notes<textarea name="notes" rows={3} defaultValue={wallet.notes??""}/></label><div className="form-row"><label>Priority<select name="priority" defaultValue={wallet.priority}><option value="low">Low</option><option value="normal">Normal</option><option value="high">High</option></select></label><label>Alerts<select name="alertLevel" defaultValue={wallet.alert_level}><option value="all">Enabled</option><option value="off">Off</option></select></label></div>{error&&<p className="form-error">{error}</p>}<button disabled={busy} className="button primary">{busy?"Saving…":"Save changes"}</button></form>}</>;
+}
