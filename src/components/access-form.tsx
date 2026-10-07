@@ -14,7 +14,7 @@ export function AccessForm() {
       const response=await fetch("/api/access",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({password})});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error??"Could not unlock the site");
-      setPassword("");router.push("/overview");router.refresh();
+      setPassword("");router.push("/overview");
     }catch(reason){setError(reason instanceof Error?reason.message:"Request failed");}
     finally{setBusy(false);}
   }
