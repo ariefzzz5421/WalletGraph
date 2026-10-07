@@ -7,9 +7,9 @@
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "db:migrate": "node --env-file=.env --import tsx scripts/migrate.ts",
-    "worker": "node --env-file=.env --import tsx apps/worker/index.ts",
-    "bot": "node --env-file=.env --import tsx apps/bot/index.ts",
+    "db:migrate": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx scripts/migrate.ts",
+    "worker": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx apps/worker/index.ts",
+    "bot": "node --env-file-if-exists=.env --env-file-if-exists=.env.local --import tsx apps/bot/index.ts",
     "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {

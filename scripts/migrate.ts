@@ -2,10 +2,12 @@ import { readFile, readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { Pool } from "pg";
 
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
-const client=await pool.connect();
-try {
+async function main() {
+  const migrationUrl = process.env.DATABASE_URL_UNPOOLED ?? process.env.DATABASE_URL;
+  if (!migrationUrl) throw new Error("DATABASE_URL_UNPOOLED or DATABASE_URL is required");
+  const pool = new Pool({ connectionString: migrationUrl, max: 1 });
+  const client = await pool.connect();
+  try {
   await client.query("SELECT pg_advisory_lock(731043)");
   await client.query("CREATE TABLE IF NOT EXISTS schema_migrations (name text PRIMARY KEY, applied_at timestamptz NOT NULL DEFAULT now())");
   const directory=join(process.cwd(),"database");
@@ -22,8 +24,11 @@ try {
     }catch(error){await client.query("ROLLBACK");throw error;}
   }
   console.log("Database schema ready");
-} finally {
-  await client.query("SELECT pg_advisory_unlock(731043)");
-  client.release();
-  await pool.end();
+  } finally {
+    await client.query("SELECT pg_advisory_unlock(731043)");
+    client.release();
+    await pool.end();
+  }
 }
+
+main().catch(error=>{ console.error(error); process.exitCode=1; });

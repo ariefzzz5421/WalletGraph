@@ -31,9 +31,9 @@ The environment file is read by the worker, bot, and migration scripts with Node
 
 ## Deployment
 
-- Deploy the Next.js app to Vercel with `DATABASE_URL`, `APP_URL`, `REGISTRATION_CODE`, and optional provider/Discord configuration.
+- Deploy the Next.js app to Vercel with `DATABASE_URL` and a private `REGISTRATION_CODE`. `APP_URL` is optional for the web app; set it to the final public URL on the separately hosted bot so `/wallet graph` links work.
 - Deploy `npm run worker` and `npm run bot` as separate long-running services on Railway, Fly.io, Render, or a VPS. Do not run either as a Vercel request function.
-- Run `npm run db:migrate` during controlled deployment before starting the new release. Use a managed PostgreSQL instance with backups and TLS. The included Compose file is for local development only.
+- Run `npm run db:migrate` during controlled deployment before starting the new release. The migration runner prefers `DATABASE_URL_UNPOOLED` when available, because it holds a session lock while applying SQL files. Use a managed PostgreSQL instance with backups and TLS. The included Compose file is for local development only.
 - All API keys and Discord bot credentials stay server-side. The Data Sources page displays status only, never secret values.
 
 ## Evidence boundary
